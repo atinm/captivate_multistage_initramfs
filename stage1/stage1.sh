@@ -85,8 +85,9 @@ letsgo() {
     # 	exec stage$1.sh
 
     # else
-	# clean up /sdcard mount point
+	# clean up
 	rmdir /sdcard 
+	rm -r /bin
 
         # run Samsung's init and disappear
         exec /sbin/init
