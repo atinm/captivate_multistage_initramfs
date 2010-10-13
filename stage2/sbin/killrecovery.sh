@@ -13,4 +13,10 @@ then
     /sbin/recovery &
 fi
 
+# Droid X
+if [ -f /init.mapphone_cdma.rc ]
+then
+    /sbin/recovery &
+fi
+
 exit 1
