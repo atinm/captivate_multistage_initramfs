@@ -1,0 +1,8 @@
+###############################################################################
+# #
+# Multistage Initramfs load for Samsung Galaxy S based phones.
+# #
+# Uses Samsung's Captivate Initramfs. Scripts for loading are including in
+# the stage1 and stage2 directories. 
+# #
+###############################################################################
