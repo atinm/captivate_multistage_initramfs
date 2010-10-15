@@ -1,4 +1,5 @@
 #!/bin/bash
+set -x
 if [ -z $1 ] ; then
     echo "Usage: $0 number"
     echo "       where number is the stage number (2, 3, ...) for the stage you want to build"

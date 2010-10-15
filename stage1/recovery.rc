@@ -56,7 +56,13 @@ loglevel 3
     insmod /lib/modules/param.ko
 
 # Backwards Compat - XXX: Going away in G*
-    symlink /mnt/sdcard /sdcard
+#+    symlink /mnt/sdcard /sdcard>
+#+>
+    mkdir /sdcard
+#+>
+    mount vfat /dev/block/mmcblk0p1 /sdcard
+#+>
+    mount vfat /dev/block/mmcblk1p1 /sdcard/external_sd
 
     mkdir /system
     mkdir /data 0771 system system
@@ -328,12 +334,16 @@ on boot
 service console /system/bin/sh
     console
 
-service recovery /system/bin/recovery
+#+service recovery /system/bin/recovery>
+service recovery /sbin/recovery
     console
     oneshot
 
 # adbd is controlled by the persist.service.adb.enable system property
-service adbd /sbin/adbd recovery
+#+>
+setprop persist.service.adb.enable 1
+#+service adbd /sbin/adbd recovery>
+service adbd /sbin/adbd
     enabled
 
 on property:persist.service.adb.enable=1
@@ -341,3 +351,4 @@ on property:persist.service.adb.enable=1
 
 on property:persist.service.adb.enable=0
     stop adbd
+

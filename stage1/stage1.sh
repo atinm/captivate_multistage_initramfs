@@ -49,16 +49,33 @@ load_stage() {
 			    log "load stage $1 from SD"
 			    lzcat -dc $stagefile | cpio -div
 			    echo 1 > /tmp/stage$1_loaded
-			    return
+			    break
 			fi
 		    done
-		    log "stage $1 not loaded, signature mismatch"
+		    if ! test -f /tmp/stage$1_loaded ; then
+			log "stage $1 not loaded, signature mismatch"
+		    fi
 		else
 		    log "stage $1 not loaded, $stagefile not found"
 		fi
 
 		;;
 	esac
+	initrc="/sdcard/init/init.rc"
+	if test -f $initrc ; then
+	    # copy the init.rc file over to /
+	    log "copying $initrc to /init.rc"
+	    cp $initrc /init.rc
+	    chmod 0755 /init.rc
+	fi
+
+	init="/sdcard/init/init"
+	if test -f $init ; then
+	    # copy the init file over to /sbin
+	    log "copying $init to /sbin/init"
+	    cp $init /sbin/init
+	    chmod 0755 /sbin/init
+	fi
     fi
 }
 
@@ -94,7 +111,7 @@ letsgo() {
     # fi
 }
 
-setup_devices() {
+pre_init() {
     # proc and sys are  used 
     mount -t proc proc /proc
     mount -t sysfs sys /sys
@@ -106,7 +123,9 @@ setup_devices() {
     # standard
     mknod /dev/null c 1 3
     mknod /dev/zero c 1 5
+}
 
+setup_devices() {
     # internal & external SD
     mknod /dev/block/mmcblk0 b 179 0
     mknod /dev/block/mmcblk0p1 b 179 1
@@ -155,6 +174,9 @@ setup_devices() {
     mount_system
     mount_sdcard
 }
+
+#do early mknod for anything needed really early
+pre_init
 
 #mknod and insmod the things we need
 setup_devices
