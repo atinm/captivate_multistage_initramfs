@@ -43,18 +43,18 @@ load_stage() {
 		if test -f $stagefile ; then
 		    # load the designated stage after verifying it's
 		    # signature to prevent security exploit from sdcard
-		    signature=`sha1sum $stagefile | cut -d' ' -f 1`
-		    for x in `cat /res/signatures/$1.sig`; do
-			if test "$x" = "$signature"  ; then
+		    #signature=`sha1sum $stagefile | cut -d' ' -f 1`
+		    #for x in `cat /res/signatures/$1.sig`; do
+			#if test "$x" = "$signature"  ; then
 			    log "load stage $1 from SD"
 			    lzcat -dc $stagefile | cpio -div
 			    echo 1 > /tmp/stage$1_loaded
-			    break
-			fi
-		    done
-		    if ! test -f /tmp/stage$1_loaded ; then
-			log "stage $1 not loaded, signature mismatch"
-		    fi
+			#    break
+			#fi
+		    #done
+		    #if ! test -f /tmp/stage$1_loaded ; then
+			#log "stage $1 not loaded, signature mismatch"
+		    #fi
 		else
 		    log "stage $1 not loaded, $stagefile not found"
 		fi

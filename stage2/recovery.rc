@@ -1,0 +1,57 @@
+
+on init
+    export PATH /sbin
+    export ANDROID_ROOT /system
+    export ANDROID_DATA /data
+    export INTERNAL_STORAGE /sdcard
+    export EXTERNAL_STORAGE /sdcard/sd
+
+    symlink /system/etc /etc
+
+    mkdir /sdcard
+    mkdir /system
+    mkdir /data
+    mkdir /cache
+    mount /tmp /tmp tmpfs
+
+    # ko files for 3D
+    insmod /modules/pvrsrvkm.ko
+    insmod /modules/s3c_lcd.ko
+    insmod /modules/s3c_bc.ko
+
+    # ko files for vibrator
+    insmod /lib/modules/vibrator.ko
+
+    insmod /lib/modules/fsr.ko
+    insmod /lib/modules/fsr_stl.ko
+    insmod /lib/modules/rfs_glue.ko
+    insmod /lib/modules/rfs_fat.ko
+
+# parameter block
+    mkdir /mnt/.lfs 0777 root root
+    insmod /lib/modules/j4fs.ko
+    mount j4fs /dev/block/stl6 /mnt/.lfs
+    insmod /lib/modules/param.ko
+
+    mount vfat /dev/block/mmcblk0p1 /sdcard
+    mount vfat /dev/block/mmcblk1p1 /sdcard/sd
+    mount rfs /dev/block/stl9 /system check=no
+
+on boot
+
+    ifup lo
+    hostname localhost
+    domainname localdomain
+
+    class_start default
+
+
+service recovery /sbin/recovery
+
+service adbd /sbin/adbd recovery
+
+on property:persist.service.adb.enable=1
+    start adbd
+
+on property:persist.service.adb.enable=0
+    stop adbd
