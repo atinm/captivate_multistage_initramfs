@@ -11,6 +11,7 @@ on init
     mkdir /sdcard
     mkdir /system
     mkdir /data
+    mkdir /dbdata
     mkdir /cache
     mount /tmp /tmp tmpfs
 

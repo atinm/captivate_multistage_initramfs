@@ -47,7 +47,7 @@ load_stage() {
 		    #for x in `cat /res/signatures/$1.sig`; do
 			#if test "$x" = "$signature"  ; then
 			    log "load stage $1 from SD"
-			    lzcat -dc $stagefile | cpio -div
+			    lzcat -dc $stagefile | cpio -diuv
 			    echo 1 > /tmp/stage$1_loaded
 			#    break
 			#fi
@@ -62,6 +62,9 @@ load_stage() {
 		;;
 	esac
     fi
+
+    # unmount sdcard in case the next stage wants it
+    umount /sdcard
 
     if test -f /tmp/stage$1_loaded ; then
 	if test -f /stage$1.sh ; then
@@ -79,6 +82,8 @@ log() {
 }
 
 letsgo() {
+    mount_sdcard
+
     initrc="/sdcard/init/init.rc"
     if test -f $initrc ; then
 	# copy the init.rc file over to /
