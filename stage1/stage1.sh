@@ -89,10 +89,10 @@ letsgo() {
 
     init="/sdcard/init/init"
     if test -f $init ; then
-	# copy the init file over to /sbin
-	log "copying $init to /sbin/init"
-	cp $init /sbin/init
-	chmod 0755 /sbin/init
+    	# copy the init file over to /sbin
+    	log "copying $init to /sbin/init"
+    	cp $init /sbin/init
+    	chmod 0755 /sbin/init
     fi
 
     # dump logs to the sdcard
