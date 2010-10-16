@@ -1,3 +1,3 @@
 #!/bin/sh
 
-exec /stage1.sh >> /stage1.log 2>&1
+exec /stage1.sh >> /init.log 2>&1

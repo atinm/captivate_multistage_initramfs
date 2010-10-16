@@ -61,54 +61,57 @@ load_stage() {
 
 		;;
 	esac
-	initrc="/sdcard/init/init.rc"
-	if test -f $initrc ; then
-	    # copy the init.rc file over to /
-	    log "copying $initrc to /init.rc"
-	    cp $initrc /init.rc
-	    chmod 0755 /init.rc
-	fi
+    fi
 
-	init="/sdcard/init/init"
-	if test -f $init ; then
-	    # copy the init file over to /sbin
-	    log "copying $init to /sbin/init"
-	    cp $init /sbin/init
-	    chmod 0755 /sbin/init
+    if test -f /tmp/stage$1_loaded ; then
+	if test -f /stage$1.sh ; then
+            log "running /stage$1.sh"
+	    /stage$1.sh >> /init-$1.log 2>&1
+	    return $?
 	fi
     fi
+    return 1
 }
 
 log() {
     log="stage1.sh: $1"
-    echo `date '+%Y-%m-%d %H:%M:%S'` $log >> /stage1.log
+    echo `date '+%Y-%m-%d %H:%M:%S'` $log >> /init.log
 }
 
 letsgo() {
+    initrc="/sdcard/init/init.rc"
+    if test -f $initrc ; then
+	# copy the init.rc file over to /
+	log "copying $initrc to /init.rc"
+	cp $initrc /init.rc
+	chmod 0755 /init.rc
+    fi
+
+    init="/sdcard/init/init"
+    if test -f $init ; then
+	# copy the init file over to /sbin
+	log "copying $init to /sbin/init"
+	cp $init /sbin/init
+	chmod 0755 /sbin/init
+    fi
+
     # dump logs to the sdcard
     if test -d /sdcard/init ; then
 	log "running stage1 init !"
 	
 	if test $debug_mode = 1; then
-	    cat /stage1.log > /sdcard/init/stage1-init-"`date '+%Y-%m-%d_%H-%M-%S'`".log
+	    cat /init.log > /sdcard/init/init-"`date '+%Y-%m-%d_%H-%M-%S'`".log
 	fi
     fi
 
     umount /sdcard
     umount /system
 
-    # if test -f /tmp/stage$1_loaded ; then
-    #     # run the next stage init
-    # 	exec stage$1.sh
+    rmdir /sdcard 
+    rm -r /bin
 
-    # else
-	# clean up
-	rmdir /sdcard 
-	rm -r /bin
-
-        # run Samsung's init and disappear
-        exec /sbin/init
-    # fi
+    # run init and disappear
+    exec /sbin/init
 }
 
 pre_init() {
@@ -186,8 +189,8 @@ if test -f /sdcard/init/enable-debug ; then
     debug_mode=1
 fi
 
-# STAGE 2
+# Stage 2 - the only stage right now
 load_stage 2
 
-# run stage2's init or samsung's init on failure
-letsgo 2
+# clean up and run init
+letsgo
