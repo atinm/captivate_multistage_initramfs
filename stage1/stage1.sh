@@ -194,8 +194,13 @@ if test -f /sdcard/init/enable-debug ; then
     debug_mode=1
 fi
 
-# Stage 2 - the only stage right now
-load_stage 2
+# Load stages - starting at 2 (we are 1)
+num=2
+while test -f /sdcard/init/stage$num.cpio.lzma
+do
+    load_stage $num
+    num=$(($num+1))
+done
 
 # clean up and run init
 letsgo
