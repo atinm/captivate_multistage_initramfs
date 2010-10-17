@@ -1,8 +1,5 @@
 #!/bin/sh
 set -x
-echo "Stage2!"
-exit 0
-
 status=0
 data_archive='/sdcard/rfs_user-data.tar'
 alias mount_data_ext4="mount -t ext4 -o noatime,nodiratime /dev/block/mmcblk0p2 /data"
@@ -27,6 +24,16 @@ check_free() {
     log "free space : $target_free"
     log "space needed : $space_needed"
     return `test "$target_free" -ge "$space_needed"`
+}
+
+restore_backup() {
+    # clean any previous false dbdata partition
+    rm -rf /dbdata/*
+    # extract from the tar backup,
+    # with dirty workaround to fix battery level inaccuracy
+    # then remove the backup tarball if everything went smooth
+    tar xf $data_archive --exclude=/data/system/batterystats.bin \
+	&& rm $data_archive
 }
 
 ext4_check() {
@@ -74,30 +81,30 @@ do_lagfix()
 	log "build the ext4 filesystem"
 	
 	# (empty) /etc/mtab is required for this mkfs.ext4
-	# mkfs.ext4 -F -O sparse_super /dev/block/mmcblk0p2
+	mkfs.ext4 -F -O sparse_super /dev/block/mmcblk0p2
 	# force check the filesystem after 100 mounts or 100 days
-	# tune2fs -c 100 -i 100d -m 0 /dev/block/mmcblk0p2
+	tune2fs -c 100 -i 100d -m 0 /dev/block/mmcblk0p2
 		
-	# mount_data_ext4
-	# mount_dbdata
+	mount_data_ext4
+	mount_dbdata
 
-	# mount_sdcard
+	mount_sdcard
 
 	# restore the data archived
-	# restore_backup
+	restore_backup
 
 	# clean all these mounts but leave /data mounted
-	# log "umount what will be re-mounted by Samsung's Android init"
-	# umount /dbdata
-	# umount /sdcard
+	log "umount what will be re-mounted by Samsung's Android init"
+	umount /dbdata
+	umount /sdcard
 
     else
 	# seems that we have a ext4 partition ;) just mount it
 	log "protected ext4 detected, mounting ext4 /data !"
-	# e2fsck -p /dev/block/mmcblk0p2
+	e2fsck -p /dev/block/mmcblk0p2
 
 	#leave /data mounted
-	# mount_data_ext4
+	mount_data_ext4
     fi
 
     status=0
