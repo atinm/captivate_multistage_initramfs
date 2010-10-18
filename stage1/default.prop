@@ -1,5 +1,5 @@
 #
-# Debug enabled ADDITIONAL_DEFAULT_PROPERTIES
+# ADDITIONAL_DEFAULT_PROPERTIES
 #
 ro.secure=0
 ro.allow.mock.location=1

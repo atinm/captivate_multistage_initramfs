@@ -2,7 +2,7 @@
 set -x
 status=0
 data_archive='/sdcard/rfs_user-data.tar'
-alias mount_data_ext4="mount -t ext4 -o noatime,nodiratime /dev/block/mmcblk0p2 /data"
+alias mount_data_ext4="mount -t ext4 -o noatime,nodiratime,barrier=0,noauto_da_alloc /dev/block/mmcblk0p2 /data"
 alias mount_data_rfs="mount -t rfs -o nosuid,nodev,check=no /dev/block/mmcblk0p2 /data"
 alias mount_sdcard="mount -t vfat -o utf8 /dev/block/mmcblk0p1 /sdcard"
 alias mount_cache="mount -t rfs -o nosuid,nodev,check=no /dev/block/stl11 /cache"
