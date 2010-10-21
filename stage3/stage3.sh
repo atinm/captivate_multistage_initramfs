@@ -1,13 +1,41 @@
 #!/bin/sh
+PATH=/bin:/sbin:/usr/bin/:/usr/sbin:/system/bin:/system/sbin
 set -x
 status=0
-data_archive='/sdcard/rfs_user-data.tar'
-alias mount_data_ext4="mount -t ext4 -o noatime,nodiratime,barrier=0,noauto_da_alloc /dev/block/mmcblk0p2 /data"
-alias mount_data_rfs="mount -t rfs -o nosuid,nodev,check=no /dev/block/mmcblk0p2 /data"
-alias mount_sdcard="mount -t vfat -o utf8 /dev/block/mmcblk0p1 /sdcard"
-alias mount_cache="mount -t rfs -o nosuid,nodev,check=no /dev/block/stl11 /cache"
-alias mount_dbdata="mount -t rfs -o nosuid,nodev,check=no /dev/block/stl10 /dbdata"
-alias make_backup="tar cf $data_archive /data /dbdata"
+ data_partition="/dev/block/mmcblk0p2"
+sdcard_partition="/dev/block/mmcblk0p1"
+sdcard_ext_partition="/dev/block/mmcblk1"
+sdcard='/sdcard'
+sdcard_ext='/sdcard/sdcard_ext'
+data_archive="$sdcard/user-data.tar"
+
+dbdata_partition="/dev/block/stl10"
+
+alias check_dbdata="fsck_msdos -y $dbdata_partition"
+alias make_backup="tar cvf $data_archive /data /dbdata"
+
+mount_() {
+    case $1 in
+	cache)
+	    mount -t rfs -o nosuid,nodev,check=no /dev/block/stl11 /cache
+	    ;;
+	dbdata)
+	    mount -t rfs -o nosuid,nodev,check=no $dbdata_partition /dbdata
+	    ;;
+	data_rfs)
+	    mount -t rfs -o nosuid,nodev,check=no $data_partition /data
+	    ;;
+	data_ext4)
+	    mount -t ext4 -o noatime,barrier=0,noauto_da_alloc $data_partition /data
+	    ;;
+	sdcard)
+	    mount -t vfat -o utf8 $sdcard_partition $sdcard
+	    ;;
+	sdcard_ext)
+	    mount -t vfat -o utf8 $sdcard_ext_partition $sdcard_ext
+	    ;;
+    esac
+}
 
 log() {
     log="stage3.sh: $1"
@@ -16,35 +44,109 @@ log() {
 }
 
 check_free() {
+    # FIXME: add the check if we have enough space based on the
+    # space lost with Ext4 conversion with offset
+	
     # read free space on internal SD
-    target_free=`df /sdcard | awk '/\/sdcard$/ {print $2}'`
+    target_free=`df $sdcard | cut -d' ' -f 6 | cut -d K -f 1`
+
     # read space used by data we need to save
-    space_needed=$((`df /data | awk '/ \/data$/ {print $3}'` \
-	+ `df /dbdata | awk '/ \/dbdata$/ {print $3}'`))
+    mount
+    df /data
+    df /dbdata
+    space_needed=$((`df /data | cut -d' ' -f 4 | cut -d K -f 1` + \
+	`df /dbdata | cut -d' ' -f 4 | cut -d K -f 1`))
+
     log "free space : $target_free"
     log "space needed : $space_needed"
-    return `test "$target_free" -ge "$space_needed"`
+    
+    # more than 100MB on /data, talk to the user
+    test $data_space_needed -gt 102400 && say "wait"
+
+    # FIXME: get a % of security
+    test $target_free -ge $space_needed
+}
+
+wipe_data_filesystem() {
+    # ext4 is very hard to wipe due to it's superblock which provide
+    # much security, so we wipe the start of the partition (3MB)
+    # wich does enouch to prevent blkid to detect Ext4.
+    # RFS is also seriously hit by 3MB of zeros ;)
+    dd if=/dev/zero of=$data_partition bs=1024 count=$((3 * 1024))
+    sync
 }
 
 restore_backup() {
     # clean any previous false dbdata partition
-    rm -rf /dbdata/*
-    # extract from the tar backup,
+    rm -r /dbdata/*
+    umount /dbdata
+    check_dbdata
+    mount_ dbdata
+    # extract from the backup,
     # with dirty workaround to fix battery level inaccuracy
-    # then remove the backup tarball if everything went smooth
-    tar xf $data_archive --exclude=/data/system/batterystats.bin \
-	&& rm $data_archive
+    # then remove the backup file if everything went smooth
+    tar xvf $data_archive && rm $data_archive
+    rm /data/system/batterystats.bin
+}
+
+say() {
+    # play !
+    madplay -A -4 -o wave:- "/res/voices/$1.mp3" | \
+	aplay -Dpcm.AndroidPlayback_Speaker --buffer-size=4096
 }
 
 ext4_check() {
-    log "ext4 partition detection"
-    if dumpe2fs -h /dev/block/mmcblk0p2; then
-	log "ext4 partition detected"
+    log "ext4 filesystem detection"
+    if tune2fs -l $data_partition; then
+	# we found an ext2/3/4 partition. but is it real ?
+	# if the data partition mounts as rfs, it means
+	# that this ext4 partition is just lost bits still here
+	if mount_ data_rfs; then
+	    log "ext4 bits found but from an invalid and corrupted filesystem"
+	    return 1
+	fi
+	log "ext4 filesystem detected"
 	return 0
     fi
-
-    log "no ext4 partition detected"
+    log "no ext4 filesystem detected"
     return 1
+}
+
+install_scripts() {
+    if ! cmp /res/scripts/fat.format_wrapper.sh /system/bin/fat.format_wrapper.sh; then
+
+	if ! test -L /system/bin/fat.format; then
+
+	    # if fat.format is not a symlink, it means that it's
+	    # Samsung's binary. Let's rename it
+	    mv /system/bin/fat.format /system/bin/fat.format.real
+	    log "fat.format renamed to fat.format.real"
+	fi
+
+	cat /res/scripts/fat.format_wrapper.sh > /system/bin/fat.format_wrapper.sh
+	chmod 755 /system/bin/fat.format_wrapper.sh
+
+	ln -s /system/bin/fat.format_wrapper.sh /system/bin/fat.format
+	log "fat.format wrapper installed"
+    else
+	log "fat.format wrapper already installed"
+    fi
+}
+
+letsgo() {
+    # paranoid security: prevent any data leak
+    test -f $data_archive && rm -v $data_archive
+
+    install_scripts
+
+    # remove voices from memory
+    rm -r /res/voices
+
+    rm -r /etc
+    rm -r /usr
+    rm /lib/* # remove the libs we installed, leave modules
+
+    exit $status
 }
 
 do_lagfix()
@@ -54,15 +156,16 @@ do_lagfix()
 	
 	# mount ressources we need
 	log "mount resources to backup"
-	mount_data_rfs
-	mount_dbdata
-	mount_sdcard
+	say "to-ext4"
+	mount_ data_rfs
+	mount_ dbdata
 
 	# check if there is enough free space for migration or cancel
 	# and boot
 	if ! check_free; then
 		log "not enough space to migrate from rfs to ext4"
-		mount_data_rfs
+		say "cancel-no-space"
+		mount_ data_rfs
 		umount /dbdata
 		status=1
 		return $status
@@ -80,35 +183,60 @@ do_lagfix()
 	# build the ext4 filesystem
 	log "build the ext4 filesystem"
 	
+	# Ext4 DATA 
 	# (empty) /etc/mtab is required for this mkfs.ext4
-	mkfs.ext4 -F -O sparse_super /dev/block/mmcblk0p2
+	cat /etc/mke2fs.conf
+	mkfs.ext4 -F -O sparse_super $data_partition
 	# force check the filesystem after 100 mounts or 100 days
-	tune2fs -c 100 -i 100d -m 0 /dev/block/mmcblk0p2
-		
-	mount_data_ext4
-	mount_dbdata
+	tune2fs -c 100 -i 100d -m 0 $data_partition
 
-	mount_sdcard
+	mount_ data_ext4
+	mount_ dbdata
+
+	mount_ sdcard
 
 	# restore the data archived
+	say "step2"
 	restore_backup
 
 	# clean all these mounts but leave /data mounted
 	log "umount what will be re-mounted by Samsung's Android init"
 	umount /dbdata
 	umount /sdcard
+	say "success"
 
     else
 	# seems that we have a ext4 partition ;) just mount it
 	log "protected ext4 detected, mounting ext4 /data !"
-	e2fsck -p /dev/block/mmcblk0p2
+	e2fsck -p $data_partition
 
 	#leave /data mounted
-	mount_data_ext4
+	mount_ data_ext4
     fi
 
     status=0
     return $status
+}
+
+create_devices() {
+    mkdir -p /dev/snd
+
+    # soundcard
+    mknod /dev/snd/controlC0 c 116 0
+    mknod /dev/snd/controlC1 c 116 32
+    mknod /dev/snd/pcmC0D0c c 116 24
+    mknod /dev/snd/pcmC0D0p c 116 16
+    mknod /dev/snd/pcmC1D0c c 116 56
+    mknod /dev/snd/pcmC1D0p c 116 48
+    mknod /dev/snd/timer c 116 33
+
+    # we will need these directories
+    mkdir /cache 2> /dev/null
+    mkdir /dbdata 2> /dev/null 
+    mkdir /data 2> /dev/null 
+
+    # copy the sound configuration
+    cat /system/etc/asound.conf > /etc/asound.conf
 }
 
 insert_modules() {
@@ -117,12 +245,29 @@ insert_modules() {
     insmod /lib/modules/ext4.ko
 }
 
+create_devices
+
 insert_modules
+
+# detect the MASTER_CLEAR intent command
+# this append when you choose to wipe everything from the phone settings,
+# or when you type *2767*3855# (Factory Reset, datas + SDs wipe)
+mount_ cache
+if test -f /cache/recovery/command; then
+
+    if test `cat /cache/recovery/command | cut -d '-' -f 3` = 'wipe_data'; then
+	log "MASTER_CLEAR mode"
+	say "factory-reset"
+		# if we are in this mode, we still have to wipe ext4 partition start
+	wipe_data_filesystem
+	umount /cache
+	letsgo
+    fi
+fi
+umount /cache
 
 do_lagfix
 
-rm -r /etc
-rm -r /usr
-rm /lib/* # remove the libs we installed, leave modules
+letsgo
 
 exit $status

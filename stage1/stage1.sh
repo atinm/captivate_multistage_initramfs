@@ -27,10 +27,10 @@
 #                                                                             #
 ###############################################################################
 set -x
-PATH=/bin:/sbin:/usr/bin/:/usr/sbin:/system/bin:/system/sbin
+PATH=/bin:/sbin:/system/bin:/system/sbin
 
 alias mount_sdcard="mount -t vfat -o utf8 /dev/block/mmcblk0p1 /sdcard"
-alias mount_system="mount -t rfs -o ro,check=no /dev/block/stl9 /system"
+alias mount_system="mount -t rfs -o rw,check=no /dev/block/stl9 /system"
 debug_mode=1
 
 load_stage() {
@@ -63,9 +63,6 @@ load_stage() {
 	esac
     fi
 
-    # unmount sdcard in case the next stage wants it
-    umount /sdcard
-
     if test -f /tmp/stage$1_loaded ; then
 	if test -f /stage$1.sh ; then
             log "running /stage$1.sh"
@@ -82,8 +79,6 @@ log() {
 }
 
 letsgo() {
-    mount_sdcard
-
     initrc="/sdcard/init/init.rc"
     if test -f $initrc ; then
 	# copy the init.rc file over to /
@@ -119,25 +114,25 @@ letsgo() {
     exec /sbin/init
 }
 
-pre_init() {
+create_devices() {
     # proc and sys are  used 
     mount -t proc proc /proc
     mount -t sysfs sys /sys
 
     # create used devices nodes
-    mkdir /dev/block
+    mkdir -p /dev/block
 
     # create used devices nodes
     # standard
     mknod /dev/null c 1 3
     mknod /dev/zero c 1 5
-}
 
-setup_devices() {
     # internal & external SD
     mknod /dev/block/mmcblk0 b 179 0
     mknod /dev/block/mmcblk0p1 b 179 1
     mknod /dev/block/mmcblk0p2 b 179 2
+    mknod /dev/block/mmcblk0p3 b 179 2
+    mknod /dev/block/mmcblk0p4 b 179 2
     mknod /dev/block/stl1 b 138 1
     mknod /dev/block/stl2 b 138 2
     mknod /dev/block/stl3 b 138 3
@@ -150,7 +145,9 @@ setup_devices() {
     mknod /dev/block/stl10 b 138 10
     mknod /dev/block/stl11 b 138 11
     mknod /dev/block/stl12 b 138 12
+}
 
+insert_modules() {
     # ko files for 3D
     insmod /modules/pvrsrvkm.ko
     insmod /modules/s3c_lcd.ko
@@ -177,17 +174,18 @@ setup_devices() {
     insmod /lib/modules/modemctl.ko
     insmod /lib/modules/storage.ko
     insmod /lib/modules/bthid.ko
-
-    # new in beta5, using /system
-    mount_system
-    mount_sdcard
 }
 
-#do early mknod for anything needed really early
-pre_init
+#do mknods for the devices
+create_devices
 
-#mknod and insmod the things we need
-setup_devices
+#insmod the things we need
+insert_modules
+
+
+# new in beta5, using /system
+mount_system
+mount_sdcard
 
 # debug mode detection
 if test -f /sdcard/init/enable-debug ; then
