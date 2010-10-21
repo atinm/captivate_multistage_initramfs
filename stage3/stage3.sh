@@ -26,7 +26,7 @@ mount_() {
 	    mount -t rfs -o nosuid,nodev,check=no $data_partition /data
 	    ;;
 	data_ext4)
-	    mount -t ext4 -o noatime,barrier=0,noauto_da_alloc $data_partition /data
+	    mount -t ext4 -o noatime,nodiratime,barrier=0,noauto_da_alloc $data_partition /data
 	    ;;
 	sdcard)
 	    mount -t vfat -o utf8 $sdcard_partition $sdcard
@@ -97,7 +97,7 @@ say() {
 
 ext4_check() {
     log "ext4 filesystem detection"
-    if tune2fs -l $data_partition; then
+    if /usr/sbin/tune2fs -l $data_partition; then
 	# we found an ext2/3/4 partition. but is it real ?
 	# if the data partition mounts as rfs, it means
 	# that this ext4 partition is just lost bits still here
@@ -186,9 +186,9 @@ do_lagfix()
 	# Ext4 DATA 
 	# (empty) /etc/mtab is required for this mkfs.ext4
 	cat /etc/mke2fs.conf
-	mkfs.ext4 -F -O sparse_super $data_partition
+	/usr/sbin/mkfs.ext4 -F -O sparse_super $data_partition
 	# force check the filesystem after 100 mounts or 100 days
-	tune2fs -c 100 -i 100d -m 0 $data_partition
+	/usr/sbin/tune2fs -c 100 -i 100d -m 0 $data_partition
 
 	mount_ data_ext4
 	mount_ dbdata
@@ -204,17 +204,17 @@ do_lagfix()
 	umount /dbdata
 	umount /sdcard
 	say "success"
-
+	status=0
     else
 	# seems that we have a ext4 partition ;) just mount it
 	log "protected ext4 detected, mounting ext4 /data !"
-	e2fsck -p $data_partition
+	/usr/sbin/e2fsck -p $data_partition
 
 	#leave /data mounted
 	mount_ data_ext4
+	status=0
     fi
 
-    status=0
     return $status
 }
 
@@ -231,9 +231,9 @@ create_devices() {
     mknod /dev/snd/timer c 116 33
 
     # we will need these directories
-    mkdir /cache 2> /dev/null
-    mkdir /dbdata 2> /dev/null 
-    mkdir /data 2> /dev/null 
+    mkdir -p /cache 2> /dev/null
+    mkdir -p /dbdata 2> /dev/null 
+    mkdir -p /data 2> /dev/null 
 
     # copy the sound configuration
     cat /system/etc/asound.conf > /etc/asound.conf
@@ -258,7 +258,8 @@ if test -f /cache/recovery/command; then
     if test `cat /cache/recovery/command | cut -d '-' -f 3` = 'wipe_data'; then
 	log "MASTER_CLEAR mode"
 	say "factory-reset"
-		# if we are in this mode, we still have to wipe ext4 partition start
+
+	# if we are in this mode, we still have to wipe ext4 partition start
 	wipe_data_filesystem
 	umount /cache
 	letsgo
