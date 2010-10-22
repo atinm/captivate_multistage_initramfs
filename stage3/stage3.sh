@@ -2,7 +2,7 @@
 PATH=/bin:/sbin:/usr/bin/:/usr/sbin:/system/bin:/system/sbin
 set -x
 status=0
- data_partition="/dev/block/mmcblk0p2"
+data_partition="/dev/block/mmcblk0p2"
 sdcard_partition="/dev/block/mmcblk0p1"
 sdcard_ext_partition="/dev/block/mmcblk1"
 sdcard='/sdcard'
@@ -149,6 +149,66 @@ letsgo() {
     exit $status
 }
 
+do_rfs() {
+    if ext4_check; then
+	log "lag fix disabled and Ext4 detected"
+	# ext4 partition detected, let's convert it back to rfs :'(
+	# mount resources
+	mount_ data_ext4
+	mount_ dbdata
+	say "to-rfs"
+
+	log "run backup of Ext4 /data"
+	
+	# check if there is enough free space for migration or cancel
+	# and boot
+	if ! check_free; then
+	    log "not enough space to migrate from ext4 to rfs"
+	    say "cancel-no-replace"
+	    mount_ data_ext4
+	    status=1
+	    return $status
+	fi
+
+	say "step1"&
+	make_backup
+	
+	# umount data because we will wipe it
+	/sbin/umount /data
+
+	# wipe Ext4 filesystem
+	log "wipe Ext4 filesystem before formating $data_partition as RFS"
+	wipe_data_filesystem
+
+	# format as RFS
+	# for some obsure reason, fat.format really won't want to
+	# work in this pre-init. That's why we use an alternative technique
+	/sbin/zcat /res/configs/rfs_filesystem_data_16GB.gz > $data_partition
+	fsck_msdos -y $data_partition
+
+	# restore the data archived
+	log "restore backup on rfs /data"
+	say "step2"
+	mount_ data_rfs
+	restore_backup
+	
+	/bin/umount /dbdata
+	say "success"
+
+	status=0
+
+    else
+	# in this case, we did not detect any valid ext4 partition
+	# hopefully this is because $data_partition contains a valid rfs /data
+	log "lag fix disabled, rfs present"
+	log "mount /data as rfs"
+	mount_ data_rfs
+	status=0
+    fi
+
+    return $status
+}
+
 do_lagfix()
 {
     if ! ext4_check ; then
@@ -267,7 +327,12 @@ if test -f /cache/recovery/command; then
 fi
 umount /cache
 
-do_lagfix
+mount_ sdcard
+if test -e $sdcard/init/disable-lagfix; then
+    do_rfs
+else
+    do_lagfix
+fi
 
 letsgo
 

@@ -463,10 +463,15 @@ on boot
          
  # +++++++++++++++++++++++++++++++++++++++++++
 
+    start sysinit
     class_start default
 
 ## Daemon processes to be run by init.
 ##
+service sysinit /system/bin/logwrapper /system/xbin/busybox run-parts /system/etc/init.d
+    oneshot
+    disabled
+
 service console /system/bin/sh
     user shell
     group shell system log
