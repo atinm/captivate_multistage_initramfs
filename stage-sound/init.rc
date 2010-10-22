@@ -121,8 +121,10 @@ loglevel 3
 # use movinand second partition as /data. d.moskvitin
 	#exec apply_system_policy /dev/block/stl10
     exec apply_disk_policy
-    mkdir /data
-    mount rfs /dev/block/mmcblk0p2 /data nosuid nodev check=no
+    #
+    #mounted in stage3 and converted to ext4
+    #mount ext4 /dev/block/mmcblk0p2 /data nosuid nodev check=no
+    #
     chown system system /data
     chmod 0771 /data
 

@@ -1,5 +1,5 @@
-#!/bin/sh
-PATH=/bin:/sbin:/usr/bin/:/usr/sbin:/system/bin:/system/sbin
+#!/sbin/busybox sh
+PATH=/sbin:/usr/bin/:/usr/sbin:/system/bin:/system/sbin
 set -x
 status=0
 data_partition="/dev/block/mmcblk0p2"
@@ -12,35 +12,35 @@ data_archive="$sdcard/user-data.tar"
 dbdata_partition="/dev/block/stl10"
 
 alias check_dbdata="fsck_msdos -y $dbdata_partition"
-alias make_backup="tar cvf $data_archive /data /dbdata"
+alias make_backup="/sbin/busybox tar cvf $data_archive /data /dbdata"
 
 mount_() {
     case $1 in
 	cache)
-	    mount -t rfs -o nosuid,nodev,check=no /dev/block/stl11 /cache
+	    /sbin/busybox mount -t rfs -o nosuid,nodev,check=no /dev/block/stl11 /cache
 	    ;;
 	dbdata)
-	    mount -t rfs -o nosuid,nodev,check=no $dbdata_partition /dbdata
+	    /sbin/busybox mount -t rfs -o nosuid,nodev,check=no $dbdata_partition /dbdata
 	    ;;
 	data_rfs)
-	    mount -t rfs -o nosuid,nodev,check=no $data_partition /data
+	    /sbin/busybox mount -t rfs -o nosuid,nodev,check=no $data_partition /data
 	    ;;
 	data_ext4)
-	    mount -t ext4 -o noatime,nodiratime,barrier=0,noauto_da_alloc $data_partition /data
+	    /sbin/busybox mount -t ext4 -o noatime,nodiratime,barrier=0,noauto_da_alloc $data_partition /data
 	    ;;
 	sdcard)
-	    mount -t vfat -o utf8 $sdcard_partition $sdcard
+	    /sbin/busybox mount -t vfat -o utf8 $sdcard_partition $sdcard
 	    ;;
 	sdcard_ext)
-	    mount -t vfat -o utf8 $sdcard_ext_partition $sdcard_ext
+	    /sbin/busybox mount -t vfat -o utf8 $sdcard_ext_partition $sdcard_ext
 	    ;;
     esac
 }
 
 log() {
-    log="stage3.sh: $1"
-    echo -e "\n  ###  $log\n" >> /stage3.log
-    echo `date '+%Y-%m-%d %H:%M:%S'` $log >> /stage3.log
+    log="stage-sound: $1"
+    echo -e "\n  ###  $log\n" >> /stage-sound.log
+    echo `/sbin/busybox date '+%Y-%m-%d %H:%M:%S'` $log >> /stage-sound.log
 }
 
 check_free() {
@@ -48,14 +48,11 @@ check_free() {
     # space lost with Ext4 conversion with offset
 	
     # read free space on internal SD
-    target_free=`df $sdcard | cut -d' ' -f 6 | cut -d K -f 1`
+    target_free=`/sbin/busybox df $sdcard | /sbin/busybox cut -d' ' -f 6 | /sbin/busybox/cut -d K -f 1`
 
     # read space used by data we need to save
-    mount
-    df /data
-    df /dbdata
-    space_needed=$((`df /data | cut -d' ' -f 4 | cut -d K -f 1` + \
-	`df /dbdata | cut -d' ' -f 4 | cut -d K -f 1`))
+    space_needed=$((`/sbin/busybox/df /data | /sbin/busybox cut -d' ' -f 4 | /sbin/busybox cut -d K -f 1` + \
+	`/sbin/busybox df /dbdata | /sbin/busybox cut -d' ' -f 4 | /sbin/busybox cut -d K -f 1`))
 
     log "free space : $target_free"
     log "space needed : $space_needed"
@@ -72,21 +69,21 @@ wipe_data_filesystem() {
     # much security, so we wipe the start of the partition (3MB)
     # wich does enouch to prevent blkid to detect Ext4.
     # RFS is also seriously hit by 3MB of zeros ;)
-    dd if=/dev/zero of=$data_partition bs=1024 count=$((3 * 1024))
-    sync
+    /sbin/busybox dd if=/dev/zero of=$data_partition bs=1024 count=$((3 * 1024))
+    /sbin/busybox sync
 }
 
 restore_backup() {
     # clean any previous false dbdata partition
-    rm -r /dbdata/*
-    umount /dbdata
+    /sbin/busybox rm -r /dbdata/*
+    /sbin/busybox umount /dbdata
     check_dbdata
     mount_ dbdata
     # extract from the backup,
     # with dirty workaround to fix battery level inaccuracy
     # then remove the backup file if everything went smooth
-    tar xvf $data_archive && rm $data_archive
-    rm /data/system/batterystats.bin
+    /sbin/busybox tar xvf $data_archive && rm $data_archive
+    /sbin/busybox rm /data/system/batterystats.bin
 }
 
 say() {
@@ -113,20 +110,20 @@ ext4_check() {
 }
 
 install_scripts() {
-    if ! cmp /res/scripts/fat.format_wrapper.sh /system/bin/fat.format_wrapper.sh; then
+    if ! /sbin/busybox cmp /res/scripts/fat.format_wrapper.sh /system/bin/fat.format_wrapper.sh; then
 
 	if ! test -L /system/bin/fat.format; then
 
 	    # if fat.format is not a symlink, it means that it's
 	    # Samsung's binary. Let's rename it
-	    mv /system/bin/fat.format /system/bin/fat.format.real
+	    /sbin/busybox mv /system/bin/fat.format /system/bin/fat.format.real
 	    log "fat.format renamed to fat.format.real"
 	fi
 
-	cat /res/scripts/fat.format_wrapper.sh > /system/bin/fat.format_wrapper.sh
-	chmod 755 /system/bin/fat.format_wrapper.sh
+	/sbin/busybox cat /res/scripts/fat.format_wrapper.sh > /system/bin/fat.format_wrapper.sh
+	/sbin/busybox chmod 755 /system/bin/fat.format_wrapper.sh
 
-	ln -s /system/bin/fat.format_wrapper.sh /system/bin/fat.format
+	/sbin/busybox ln -s /system/bin/fat.format_wrapper.sh /system/bin/fat.format
 	log "fat.format wrapper installed"
     else
 	log "fat.format wrapper already installed"
@@ -135,16 +132,16 @@ install_scripts() {
 
 letsgo() {
     # paranoid security: prevent any data leak
-    test -f $data_archive && rm -v $data_archive
+    test -f $data_archive && /sbin/busybox rm -v $data_archive
 
     install_scripts
 
     # remove voices from memory
-    rm -r /res/voices
+    /sbin/busybox rm -r /res/voices
 
-    rm -r /etc
-    rm -r /usr
-    rm /lib/* # remove the libs we installed, leave modules
+    /sbin/busybox rm -r /etc
+    /sbin/busybox rm -r /usr
+    /sbin/busybox rm /lib/* # remove the libs we installed, leave modules
 
     exit $status
 }
@@ -174,7 +171,7 @@ do_rfs() {
 	make_backup
 	
 	# umount data because we will wipe it
-	umount /data
+	/sbin/busybox umount /data
 
 	# wipe Ext4 filesystem
 	log "wipe Ext4 filesystem before formating $data_partition as RFS"
@@ -183,7 +180,7 @@ do_rfs() {
 	# format as RFS
 	# for some obsure reason, fat.format really won't want to
 	# work in this pre-init. That's why we use an alternative technique
-	lzcat /res/configs/rfs_filesystem_data_16GB.lzma > $data_partition
+	/sbin/busybox zcat /res/configs/rfs_filesystem_data_16GB.gz > $data_partition
 	fsck_msdos -y $data_partition
 
 	# restore the data archived
@@ -192,7 +189,7 @@ do_rfs() {
 	mount_ data_rfs
 	restore_backup
 	
-	umount /dbdata
+	/sbin/busybox umount /dbdata
 	say "success"
 
 	status=0
@@ -226,7 +223,7 @@ do_lagfix()
 		log "not enough space to migrate from rfs to ext4"
 		say "cancel-no-space"
 		mount_ data_rfs
-		umount /dbdata
+		/sbin/busybox umount /dbdata
 		status=1
 		return $status
 	fi
@@ -236,16 +233,16 @@ do_lagfix()
 	make_backup
 	
 	# umount mmcblk0 ressources
-	umount /sdcard
-	umount /data
-	umount /dbdata
+	/sbin/busybox umount /sdcard
+	/sbin/busybox umount /data
+	/sbin/busybox umount /dbdata
 
 	# build the ext4 filesystem
 	log "build the ext4 filesystem"
 	
 	# Ext4 DATA 
 	# (empty) /etc/mtab is required for this mkfs.ext4
-	cat /etc/mke2fs.conf
+	/sbin/busybox cat /etc/mke2fs.conf
 	/usr/sbin/mkfs.ext4 -F -O sparse_super $data_partition
 	# force check the filesystem after 100 mounts or 100 days
 	/usr/sbin/tune2fs -c 100 -i 100d -m 0 $data_partition
@@ -261,8 +258,8 @@ do_lagfix()
 
 	# clean all these mounts but leave /data mounted
 	log "umount what will be re-mounted by Samsung's Android init"
-	umount /dbdata
-	umount /sdcard
+	/sbin/busybox umount /dbdata
+	/sbin/busybox umount /sdcard
 	say "success"
 	status=0
     else
@@ -279,30 +276,30 @@ do_lagfix()
 }
 
 create_devices() {
-    mkdir -p /dev/snd
+    /sbin/busybox mkdir -p /dev/snd
 
     # soundcard
-    mknod /dev/snd/controlC0 c 116 0
-    mknod /dev/snd/controlC1 c 116 32
-    mknod /dev/snd/pcmC0D0c c 116 24
-    mknod /dev/snd/pcmC0D0p c 116 16
-    mknod /dev/snd/pcmC1D0c c 116 56
-    mknod /dev/snd/pcmC1D0p c 116 48
-    mknod /dev/snd/timer c 116 33
+    /sbin/busybox mknod /dev/snd/controlC0 c 116 0
+    /sbin/busybox mknod /dev/snd/controlC1 c 116 32
+    /sbin/busybox mknod /dev/snd/pcmC0D0c c 116 24
+    /sbin/busybox mknod /dev/snd/pcmC0D0p c 116 16
+    /sbin/busybox mknod /dev/snd/pcmC1D0c c 116 56
+    /sbin/busybox mknod /dev/snd/pcmC1D0p c 116 48
+    /sbin/busybox mknod /dev/snd/timer c 116 33
 
     # we will need these directories
-    mkdir -p /cache 2> /dev/null
-    mkdir -p /dbdata 2> /dev/null 
-    mkdir -p /data 2> /dev/null 
+    /sbin/busybox mkdir -p /cache 2> /dev/null
+    /sbin/busybox mkdir -p /dbdata 2> /dev/null 
+    /sbin/busybox mkdir -p /data 2> /dev/null 
 
     # copy the sound configuration
-    cat /system/etc/asound.conf > /etc/asound.conf
+    /sbin/busybox cat /system/etc/asound.conf > /etc/asound.conf
 }
 
 insert_modules() {
     # insert the ext4 modules
-    insmod /lib/modules/jbd2.ko
-    insmod /lib/modules/ext4.ko
+    /sbin/busybox insmod /lib/modules/jbd2.ko
+    /sbin/busybox insmod /lib/modules/ext4.ko
 }
 
 create_devices
@@ -315,17 +312,17 @@ insert_modules
 mount_ cache
 if test -f /cache/recovery/command; then
 
-    if test `cat /cache/recovery/command | cut -d '-' -f 3` = 'wipe_data'; then
+    if test `cat /cache/recovery/command | /sbin/busybox cut -d '-' -f 3` = 'wipe_data'; then
 	log "MASTER_CLEAR mode"
 	say "factory-reset"
 
 	# if we are in this mode, we still have to wipe ext4 partition start
 	wipe_data_filesystem
-	umount /cache
+	/sbin/busybox umount /cache
 	letsgo
     fi
 fi
-umount /cache
+/sbin/busybox umount /cache
 
 mount_ sdcard
 if test -e $sdcard/init/disable*lagfix*; then
