@@ -48,11 +48,11 @@ check_free() {
     # space lost with Ext4 conversion with offset
 	
     # read free space on internal SD
-    target_free=`/sbin/busybox df $sdcard | /sbin/busybox cut -d' ' -f 6 | /sbin/busybox/cut -d K -f 1`
+    target_free=`df $sdcard | /sbin/busybox cut -d' ' -f 6 | /sbin/busybox cut -d K -f 1`
 
     # read space used by data we need to save
-    space_needed=$((`/sbin/busybox/df /data | /sbin/busybox cut -d' ' -f 4 | /sbin/busybox cut -d K -f 1` + \
-	`/sbin/busybox df /dbdata | /sbin/busybox cut -d' ' -f 4 | /sbin/busybox cut -d K -f 1`))
+    space_needed=$((`df /data | /sbin/busybox cut -d' ' -f 4 | /sbin/busybox cut -d K -f 1` + \
+	`df /dbdata | /sbin/busybox cut -d' ' -f 4 | /sbin/busybox cut -d K -f 1`))
 
     log "free space : $target_free"
     log "space needed : $space_needed"
@@ -135,6 +135,9 @@ letsgo() {
     test -f $data_archive && /sbin/busybox rm -v $data_archive
 
     install_scripts
+
+    # unmount system
+    /sbin/busybox umount /system
 
     # remove voices from memory
     /sbin/busybox rm -r /res/voices
@@ -324,6 +327,7 @@ if test -f /cache/recovery/command; then
 fi
 /sbin/busybox umount /cache
 
+mount_ system
 mount_ sdcard
 if test -e $sdcard/init/disable*lagfix*; then
     do_rfs

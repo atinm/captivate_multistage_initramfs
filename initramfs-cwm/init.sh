@@ -41,31 +41,32 @@ load_stage() {
 	if test -f $stagefile ; then
 	    # load the designated stage after verifying it's
 	    # signature to prevent security exploit from sdcard
-	    signature=`/sbin/busybox sha1sum $stagefile | /sbin/busybox cut -d' ' -f 1`
-	    for x in `/sbin/busybox cat /res/signatures/$1.sig`; do
-		if test "$x" = "$signature"  ; then
+	    #signature=`/sbin/busybox sha1sum $stagefile | /sbin/busybox cut -d' ' -f 1`
+	    #for x in `/sbin/busybox cat /res/signatures/$1.sig`; do
+		#if test "$x" = "$signature"  ; then
 		    /sbin/busybox rm stage-init.sh
 		    log "load stage $1 from SD"
 		    /sbin/busybox zcat -dc $stagefile | /sbin/busybox cpio -diuv
 		    echo 1 > /tmp/stage$1_loaded
-		    break
-		fi
-	    done
-	    if ! test -f /tmp/stage$1_loaded ; then
-		log "stage $1 not loaded, signature mismatch"
-	    fi
+		    #break
+		#fi
+	    #done
+	    #if ! test -f /tmp/stage$1_loaded ; then
+		#log "stage $1 not loaded, signature mismatch"
+	    #fi
 	else
 	    log "stage $1 not loaded, $stagefile not found"
 	fi
-    fi
 
-    if test -f /tmp/stage$1_loaded ; then
-	if test -f /stage-init.sh ; then
-            log "running /stage-init.sh for stage $1"
-	    /stage-init.sh >> /init-$1.log 2>&1
-	    return $?
+	if test -f /tmp/stage$1_loaded ; then
+	    if test -f /stage-init.sh ; then
+		log "running /stage-init.sh for stage $1"
+		/stage-init.sh >> /init-$1.log 2>&1
+		return $?
+	    fi
 	fi
     fi
+
     return 1
 }
 
