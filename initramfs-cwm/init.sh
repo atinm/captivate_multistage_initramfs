@@ -31,7 +31,7 @@ PATH=/sbin:/system/bin:/system/sbin
 
 alias mount_sdcard="/sbin/busybox mount -t vfat -o utf8 /dev/block/mmcblk0p1 /sdcard"
 alias mount_system="/sbin/busybox mount -t rfs -o rw,check=no /dev/block/stl9 /system"
-debug_mode=1
+debug_mode=0
 
 load_stage() {
     # don't reload a stage already in memory
@@ -41,19 +41,19 @@ load_stage() {
 	if test -f $stagefile ; then
 	    # load the designated stage after verifying it's
 	    # signature to prevent security exploit from sdcard
-	    #signature=`/sbin/busybox sha1sum $stagefile | /sbin/busybox cut -d' ' -f 1`
-	    #for x in `/sbin/busybox cat /res/signatures/$1.sig`; do
-		#if test "$x" = "$signature"  ; then
+	    signature=`/sbin/busybox sha1sum $stagefile | /sbin/busybox cut -d' ' -f 1`
+	    for x in `/sbin/busybox cat /res/signatures/$1.sig`; do
+		if test "$x" = "$signature"  ; then
 		    /sbin/busybox rm stage-init.sh
 		    log "load stage $1 from SD"
 		    /sbin/busybox zcat -dc $stagefile | /sbin/busybox cpio -diuv
 		    echo 1 > /tmp/stage$1_loaded
-		    #break
-		#fi
-	    #done
-	    #if ! test -f /tmp/stage$1_loaded ; then
-		#log "stage $1 not loaded, signature mismatch"
-	    #fi
+		    break
+		fi
+	    done
+	    if ! test -f /tmp/stage$1_loaded ; then
+		log "stage $1 not loaded, signature mismatch"
+	    fi
 	else
 	    log "stage $1 not loaded, $stagefile not found"
 	fi

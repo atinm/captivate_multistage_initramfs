@@ -329,7 +329,7 @@ fi
 
 mount_ system
 mount_ sdcard
-if test -e $sdcard/init/disable*lagfix*; then
+if test -e $sdcard/Voodoo/disable*lagfix*; then
     do_rfs
 else
     do_lagfix
